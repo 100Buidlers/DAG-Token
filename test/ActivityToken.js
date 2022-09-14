@@ -96,6 +96,8 @@ describe("ActivityToken", function () {
         activitytoken.setup(0, bytes)).to.emit(activitytoken, "SetupEvent").withArgs(0, bytes);
 
       console.log(await activitytoken.checkValidity(0, 0));
+      await expect(
+        activitytoken.claim(0, 0)).to.emit(activitytoken, "TransferSingle").withArgs(owner.address, nullAddress, owner.address, 0, 1);
     })
   });
 });
