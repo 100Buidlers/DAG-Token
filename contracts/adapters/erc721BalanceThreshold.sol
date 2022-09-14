@@ -21,19 +21,11 @@ contract ERC721BalanceThreshold is IAdapter {
         return 20 + 4 + 32;
     }
 
-    function evaluate(bytes memory data) public view returns (bool) {
-        address account;
-        assembly {
-            account := shr(96, calldataload(sub(calldatasize(), 20)))
-        }
+    function evaluate(bytes calldata data, address account) public view returns (bool) {
         address contractAddress = address(bytes20(data));
         uint256 balance = IERC721(contractAddress).balanceOf(account);
-        bytes4 rIdentifier;
-        uint256 threshold;
-        assembly {
-            rIdentifier := calldataload(4)
-            threshold := calldataload(24)
-        }
+        bytes4 rIdentifier = bytes4(data[20:24]);
+        uint256 threshold = uint256(bytes32(data[24:]));
         return _relOpAdapter.evaluate(rIdentifier, balance, threshold);
     }
 }

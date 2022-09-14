@@ -3,36 +3,34 @@ const { assert, expect } = require("chai");
 
 async function deployContracts() {
     const nullAddress = ethers.utils.getAddress("0x0000000000000000000000000000000000000000");
+
+    const relationalOperatorAdapterContract = await ethers.getContractFactory("RelationalOperatorAdapter");
+    relationalOperatorAdapter = await relationalOperatorAdapterContract.deploy();
+    console.log(`deployed relationalOperatorAdapter contract ${relationalOperatorAdapter.address}`);
+
+    const erc721BalanceThresholdContract = await ethers.getContractFactory("ERC721BalanceThreshold");
+    erc721BalanceThreshold = await erc721BalanceThresholdContract.deploy(relationalOperatorAdapter.address);
+    console.log(`deployed erc721BalanceThreshold contract ${erc721BalanceThreshold.address}`);
+
+    const superSolidContract = await ethers.getContractFactory("SuperSolid");
+    superSolid = await superSolidContract.deploy();
+    console.log(`deployed superSolid contract ${superSolid.address}`);
+
     const activityTokenContract = await ethers.getContractFactory("ActivityToken");
-    activitytoken = await activityTokenContract.deploy();
-    console.log("deployed activity token");
-
-    // const routerContract = await ethers.getContractFactory("Router");
-    // router = await routerContract.deploy(manager.address, nullAddress);
-    // console.log("dispatcher deployed");
-
-    // const rep3TokenContract = await ethers.getContractFactory("REP3Token");
-    // rep3Singleton = await rep3TokenContract.deploy();
-    // console.log("deployed rep3Singleton");
-
-    // const upgradeableBeaconContract = await ethers.getContractFactory("UpgradeableBeacon");
-    // upgradeableBeacon = await upgradeableBeaconContract.deploy(rep3Singleton.address);
-    // console.log("deployed upgradeable beacon");
-
-    // signers = await ethers.getSigners(); 
-    // const owner = signers[0];
-
-    // let managerNonce = await ethers.provider.getTransactionCount(manager.address);
-    // const proxyAddress = ethers.utils.getContractAddress({ from: manager.address, nonce: managerNonce });
-    // await expect(
-    //     manager.deployREP3TokenProxy("Test", "TST", [owner.address], upgradeableBeacon.address, router.address)
-    // ).to.emit(manager, "ProxyDeployed").withArgs(proxyAddress, "Test");
-    // rep3BeaconProxy = rep3Singleton.attach(proxyAddress);
-    // console.log("deployed beacon proxy");
+    activitytoken = await activityTokenContract.deploy(superSolid.address);
+    console.log(`deployed activityToken contract ${activitytoken.address}`);
     
-    return [nullAddress, activitytoken]
+    return [nullAddress, relationalOperatorAdapter, erc721BalanceThreshold, superSolid, activitytoken]
+}
+
+async function deployTestERC721(){
+    const testERC721Contract = await ethers.getContractFactory("TestERC721");
+    testERC721 = await testERC721Contract.deploy("Test", "TST");
+    console.log(`deployed testERC721 contract ${testERC721.address}`);
+    return [testERC721]
 }
 
 module.exports = {
-    deployContracts
+    deployContracts,
+    deployTestERC721,
 }
