@@ -3,16 +3,19 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/utils/Context.sol";
 
-
 import "./interfaces/IAdapter.sol";
 import "./interfaces/ISuperSolid.sol";
 
-contract SuperSolid is Context, ISuperSolid {
+contract SuperSolid is Context {
     bytes4 private constant AND_IDENTIFIER = bytes4(keccak256("and"));
     bytes4 private constant OR_IDENTIFIER = bytes4(keccak256("or"));
     bytes4 private constant NAND_IDENTIFIER = bytes4(keccak256("nand"));
 
     address private _trustedForwarder;
+
+    function getBytes4() public pure returns(bytes4[3] memory) {
+        return [AND_IDENTIFIER, OR_IDENTIFIER, NAND_IDENTIFIER];
+    }
 
     // mapping(bytes4 => function(bytes memory, address)
     //     returns (bool)) _functionMap;
@@ -20,69 +23,61 @@ contract SuperSolid is Context, ISuperSolid {
         view
         returns (bool)) _logicalOperatorMap;
 
-    constructor() {}
-
-    function setTrustedForwarder(address trustedForwarder) public {
-        _trustedForwarder = trustedForwarder;
-    }
-
-    function SuperSol_init() public {
+    constructor() {
         _logicalOperatorMap[AND_IDENTIFIER] = and;
         _logicalOperatorMap[OR_IDENTIFIER] = or;
         _logicalOperatorMap[NAND_IDENTIFIER] = nand;
     }
 
-    // last parameter should be account address
-    function evaluate(bytes calldata cBytes, bytes calldata iBytes, address account)
-        public
-        view
-        returns (bool)
-    {
+    function setTrustedForwarder(address trustedForwarder) public {
+        _trustedForwarder = trustedForwarder;
+    }
+
+    function evaluate(
+        bytes calldata cBytes,
+        bytes calldata iBytes,
+        address account
+    ) public view returns (bool) {
         bool res;
         uint256 bytesUsed;
-        (res, bytesUsed) = _evaluate_op(cBytes, iBytes);
+        (res, bytesUsed) = _evaluate_op(cBytes, iBytes, account);
         return res;
     }
 
-    function _evaluate_op(bytes calldata cBytes, bytes calldata iBytes)
+    function _evaluate_op(bytes calldata cBytes, bytes calldata iBytes, address account)
         private
         view
         returns (bool, uint256)
     {
-        bytes4 opIdentifier;
+        bytes4 opIdentifier = bytes4(cBytes[:4]);
         bytes4 nextidentifier;
-
-        assembly {
-            opIdentifier := calldataload(0)
-        }
 
         // evaluation ltree
         bool ltreeRes;
-        uint256 startLtree = 20;
+        uint256 startLtree = 4;
         uint256 ltreeBytesUsed;
-        assembly {
-            nextidentifier := calldataload(startLtree)
-        }
+        // uint256 newLevel = level + 1;
+        nextidentifier = bytes4(cBytes[startLtree:]);
         if (
             (nextidentifier == AND_IDENTIFIER) ||
             (nextidentifier == OR_IDENTIFIER) ||
             (nextidentifier == NAND_IDENTIFIER)
-        ) {
+        ) {            
             (ltreeRes, ltreeBytesUsed) = _evaluate_op(
                 cBytes[startLtree:],
-                iBytes
+                iBytes,
+                account
             );
         } else {
-            (ltreeRes, ltreeBytesUsed) = _evaluate_adapter(cBytes[startLtree:]);
+            (ltreeRes, ltreeBytesUsed) = _evaluate_adapter(cBytes[startLtree:], account);
         }
 
+
         // evaluation rtree
-        bool rtreeRes;
         uint256 startRtreeRes = startLtree + ltreeBytesUsed;
+        bool rtreeRes;
         uint256 rtreeBytesUsed;
-        assembly {
-            nextidentifier := calldataload(startRtreeRes)
-        }
+        nextidentifier = bytes4(cBytes[startRtreeRes:]);
         if (
             (nextidentifier == AND_IDENTIFIER) ||
             (nextidentifier == OR_IDENTIFIER) ||
@@ -90,20 +85,21 @@ contract SuperSolid is Context, ISuperSolid {
         ) {
             (rtreeRes, rtreeBytesUsed) = _evaluate_op(
                 cBytes[startRtreeRes:],
-                iBytes
+                iBytes,
+                account
             );
         } else {
             (rtreeRes, rtreeBytesUsed) = _evaluate_adapter(
-                cBytes[startRtreeRes:]
+                cBytes[startRtreeRes:], account
             );
         }
         return (
             _logicalOperatorMap[opIdentifier](ltreeRes, rtreeRes),
-            ltreeBytesUsed + rtreeBytesUsed
+            4 + ltreeBytesUsed + rtreeBytesUsed
         );
     }
 
-    function _evaluate_adapter(bytes calldata cBytes)
+    function _evaluate_adapter(bytes calldata cBytes, address account)
         private
         view
         returns (bool, uint256)
@@ -112,10 +108,11 @@ contract SuperSolid is Context, ISuperSolid {
         bytes memory aBytes;
         adapterAddress = address(bytes20(cBytes));
         uint256 bytesToMove = IAdapter(adapterAddress).getBytes();
+
         uint256 end = 20 + bytesToMove;
         aBytes = cBytes[20:end];
-        aBytes = abi.encodePacked(aBytes, _msgSender());
-        return (IAdapter(adapterAddress).evaluate(aBytes), end);
+
+        return (IAdapter(adapterAddress).evaluate(aBytes, account), end);
     }
 
     // logical operators ====================================
@@ -129,30 +126,5 @@ contract SuperSolid is Context, ISuperSolid {
 
     function nand(bool a, bool b) private pure returns (bool) {
         return !(a && b);
-    }
-
-    function _msgSender()
-        internal
-        view
-        override(Context)
-        returns (address sender)
-    {
-        if (isTrustedForwarder(msg.sender)) {
-            // The assembly code is more direct than the Solidity version using `abi.decode`.
-            assembly {
-                sender := shr(96, calldataload(sub(calldatasize(), 20)))
-            }
-        } else {
-            return super._msgSender();
-        }
-    }
-
-    function isTrustedForwarder(address forwarder)
-        public
-        view
-        virtual
-        returns (bool)
-    {
-        return forwarder == _trustedForwarder;
     }
 }

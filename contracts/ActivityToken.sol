@@ -20,7 +20,7 @@ import "./interfaces/ISuperSolid.sol";
  *
  * _Available since v3.1._
  */
-contract ERC1155 is Context, ERC165, IERC1155, IERC1155MetadataURI {
+contract ActivityToken is Context, ERC165, IERC1155, IERC1155MetadataURI {
     using Address for address;
 
     struct TokenData {
@@ -45,11 +45,17 @@ contract ERC1155 is Context, ERC165, IERC1155, IERC1155MetadataURI {
     // Used as the URI for all token types by relying on ID substitution, e.g. https://token-cdn-domain/{id}.json
     // string private _uri;
 
+    event SetupEvent(uint256 indexed tokenId, bytes indexed cBytes); 
+
     /**
      * @dev See {_setURI}.
      */
     constructor(address superSolid) {
         _superSolid = superSolid;
+    }
+
+    function superSolidAddress() public view returns(address){
+        return _superSolid;
     }
 
     /**
@@ -163,6 +169,7 @@ contract ERC1155 is Context, ERC165, IERC1155, IERC1155MetadataURI {
 
     function setup(uint256 tokenId, bytes calldata superSolBytes) public {
         _tokenData[tokenId] = TokenData(_msgSender(), superSolBytes);
+        emit SetupEvent(tokenId, superSolBytes);
     }
 
     function admin(uint256 tokenId) public view returns (address) {
@@ -176,7 +183,7 @@ contract ERC1155 is Context, ERC165, IERC1155, IERC1155MetadataURI {
     {
         bytes memory conditionBytes = _tokenData[tokenId].conditionBytes;
 
-        return ISuperSolid(_superSolid).evaluate(conditionBytes, data, _msgSender());
+        return ISuperSolid(_superSolid).evaluate(conditionBytes, data, msg.sender);
     }
 
     function claim(uint256 tokenId, bytes calldata data) public {

@@ -1,112 +1,103 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const {deployContracts} = require('./utils');
+const { deployContracts, deployTestERC721 } = require('./utils');
+const { getBytes4HexKeccack, TreeNode, encodeConditions } = require("./encoder")
+
+const defaultAbiCoder = ethers.utils.defaultAbiCoder;
 
 
 describe("ActivityToken", function () {
   let nullAddress;
+  let relationalOperatorAdapter;
+  let erc721BalanceThreshold;
+  let superSolid;
   let activitytoken;
+  let owner;
+  let addr1;
+  let addr2;
 
   beforeEach(async function () {
-    [nullAddress, activitytoken] = await deployContracts();
+    [nullAddress, relationalOperatorAdapter, erc721BalanceThreshold, superSolid, activitytoken] = await deployContracts();
+    [owner, addr1, addr2] = await ethers.getSigners();
+    console.log(owner.address, addr1.address, addr2.address);
   });
 
-  describe("deployment test", function () {
-    it("Should set the right unlockTime", async function () {
-      const { lock, unlockTime } = await loadFixture(deployOneYearLockFixture);
-
-      expect(await lock.unlockTime()).to.equal(unlockTime);
+  describe("activity token tests", function () {
+    it("Should deploy the contracts", async function () {
+      expect(await activitytoken.superSolidAddress()).to.equal(superSolid.address);
     });
 
-    it("Should set the right owner", async function () {
-      const { lock, owner } = await loadFixture(deployOneYearLockFixture);
+    it("Should setup tokenId 0", async function () {
+      // deploy the test erc721 contract
+      let testERC721a;
+      let testERC721b;
+      let testERC721c;
+      [testERC721a] = await deployTestERC721();
+      [testERC721b] = await deployTestERC721();
+      [testERC721c] = await deployTestERC721();
+      await expect(
+        testERC721a.mint()).to.emit(testERC721a, "Transfer").withArgs(nullAddress, owner.address, 0);
+      // await expect(
+      //   testERC721b.mint()).to.emit(testERC721b, "Transfer").withArgs(nullAddress, owner.address, 0);
+      await expect(
+        testERC721c.mint()).to.emit(testERC721c, "Transfer").withArgs(nullAddress, owner.address, 0);
+      // await expect(
+      //   testERC721c.mint()).to.emit(testERC721c, "Transfer").withArgs(nullAddress, owner.address, 1);
 
-      expect(await lock.owner()).to.equal(owner.address);
-    });
+      let node1 = new TreeNode(
+        [erc721BalanceThreshold.address.slice(2), testERC721a.address.slice(2), getBytes4HexKeccack("gt"), defaultAbiCoder.encode(["uint256"], [0]).slice(2)],
+        false,
+        "ERC721BalanceThreshold"
+      )
+      console.log(node1.data);
 
-    it("Should receive and store the funds to lock", async function () {
-      const { lock, lockedAmount } = await loadFixture(
-        deployOneYearLockFixture
-      );
+      let node2 = new TreeNode(
+        [erc721BalanceThreshold.address.slice(2), testERC721b.address.slice(2), getBytes4HexKeccack("gt"), defaultAbiCoder.encode(["uint256"], [0]).slice(2)],
+        false,
+        "ERC721BalanceThreshold"
+      )
+      console.log(node2.data);
 
-      expect(await ethers.provider.getBalance(lock.address)).to.equal(
-        lockedAmount
-      );
-    });
+      let node3 = new TreeNode(
+        [erc721BalanceThreshold.address.slice(2), testERC721c.address.slice(2), getBytes4HexKeccack("gt"), defaultAbiCoder.encode(["uint256"], [0]).slice(2)],
+        false,
+        "ERC721BalanceThreshold"
+      )
+      console.log(node3.data);
 
-    it("Should fail if the unlockTime is not in the future", async function () {
-      // We don't use the fixture here because we want a different deployment
-      const latestTime = await time.latest();
-      const Lock = await ethers.getContractFactory("Lock");
-      await expect(Lock.deploy(latestTime, { value: 1 })).to.be.revertedWith(
-        "Unlock time should be in the future"
-      );
-    });
-  });
+      let op1 = new TreeNode(
+        [getBytes4HexKeccack("and")],
+        true,
+        "and"
+      )
+      console.log(op1.data);
 
-  describe("Withdrawals", function () {
-    describe("Validations", function () {
-      it("Should revert with the right error if called too soon", async function () {
-        const { lock } = await loadFixture(deployOneYearLockFixture);
+      let op2 = new TreeNode(
+        [getBytes4HexKeccack("or")],
+        true,
+        "or"
+      )
+      console.log(op2.data);
 
-        await expect(lock.withdraw()).to.be.revertedWith(
-          "You can't withdraw yet"
-        );
-      });
+      op2.set_left(node1)
+      op2.set_right(node2)
 
-      it("Should revert with the right error if called from another account", async function () {
-        const { lock, unlockTime, otherAccount } = await loadFixture(
-          deployOneYearLockFixture
-        );
+      op1.set_right(op2);
+      op1.set_left(node3);
 
-        // We can increase the time in Hardhat Network
-        await time.increaseTo(unlockTime);
+      // op1.set_left(op2);
+      // op1.set_right(node3);
 
-        // We use lock.connect() to send a transaction from another account
-        await expect(lock.connect(otherAccount).withdraw()).to.be.revertedWith(
-          "You aren't the owner"
-        );
-      });
+      bytes = encodeConditions(op1);
+      console.log(bytes);
 
-      it("Shouldn't fail if the unlockTime has arrived and the owner calls it", async function () {
-        const { lock, unlockTime } = await loadFixture(
-          deployOneYearLockFixture
-        );
+      expect(await activitytoken.superSolidAddress()).to.equal(superSolid.address);
+      await expect(
+        activitytoken.setup(0, bytes)).to.emit(activitytoken, "SetupEvent").withArgs(0, bytes);
 
-        // Transactions are sent using the first signer by default
-        await time.increaseTo(unlockTime);
-
-        await expect(lock.withdraw()).not.to.be.reverted;
-      });
-    });
-
-    describe("Events", function () {
-      it("Should emit an event on withdrawals", async function () {
-        const { lock, unlockTime, lockedAmount } = await loadFixture(
-          deployOneYearLockFixture
-        );
-
-        await time.increaseTo(unlockTime);
-
-        await expect(lock.withdraw())
-          .to.emit(lock, "Withdrawal")
-          .withArgs(lockedAmount, anyValue); // We accept any value as `when` arg
-      });
-    });
-
-    describe("Transfers", function () {
-      it("Should transfer the funds to the owner", async function () {
-        const { lock, unlockTime, lockedAmount, owner } = await loadFixture(
-          deployOneYearLockFixture
-        );
-
-        await time.increaseTo(unlockTime);
-
-        await expect(lock.withdraw()).to.changeEtherBalances(
-          [owner, lock],
-          [lockedAmount, -lockedAmount]
-        );
-      });
-    });
+      console.log(await activitytoken.checkValidity(0, 0));
+      await expect(
+        activitytoken.claim(0, 0)).to.emit(activitytoken, "TransferSingle").withArgs(owner.address, nullAddress, owner.address, 0, 1);
+    })
   });
 });
