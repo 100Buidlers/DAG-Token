@@ -8,9 +8,11 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 
 contract LensProfileExists is IAdapter {
+    address private lensHubAddress;
     RelationalOperatorAdapter private _relOpAdapter;
 
-    constructor(address relOpAddress) {
+    constructor(address relOpAddress, address _lensHubAddress) {
+        lensHubAddress = _lensHubAddress;
         _relOpAdapter = RelationalOperatorAdapter(address(relOpAddress));
     }
 
@@ -19,8 +21,7 @@ contract LensProfileExists is IAdapter {
     }
 
     function evaluate(bytes calldata data, address account) public view returns (bool) {
-        address lensHub = 0xBf8781cA02A58CBad4870F6604a444dfA938203c;
-        uint256 balance = ILensHub(lensHub).balanceOf(account);
+        uint256 balance = ILensHub(lensHubAddress).balanceOf(account);
         bytes4 rIdentifier = bytes4(keccak256("equals"));
         uint256 threshold = 1;
         return _relOpAdapter.evaluate(rIdentifier, balance, threshold);

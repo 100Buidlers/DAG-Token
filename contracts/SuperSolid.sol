@@ -40,6 +40,20 @@ contract SuperSolid is Context {
     ) public view returns (bool) {
         bool res;
         uint256 bytesUsed;
+        bytes4 opIdentifier = bytes4(cBytes[:4]);
+        if (
+            (opIdentifier == AND_IDENTIFIER) ||
+            (opIdentifier == OR_IDENTIFIER) ||
+            (opIdentifier == NAND_IDENTIFIER)
+        ) {            
+            (res, bytesUsed) = _evaluate_op(
+                cBytes,
+                iBytes,
+                account
+            );
+        } else {
+            (res, bytesUsed) = _evaluate_adapter(cBytes, account);
+        }
         (res, bytesUsed) = _evaluate_op(cBytes, iBytes, account);
         return res;
     }

@@ -10,9 +10,10 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 contract LensPubThreshold is IAdapter {
     RelationalOperatorAdapter private _relOpAdapter;
-    address constant private lensHubAddress = 0xDb46d1Dc155634FbC732f92E853b10B288AD5a1d;
+    address private lensHubAddress;
 
-    constructor(address relOpAddress) {
+    constructor(address relOpAddress, address _lensHubAddress) {
+        lensHubAddress = _lensHubAddress;
         _relOpAdapter = RelationalOperatorAdapter(address(relOpAddress));
     }
 
