@@ -30,6 +30,13 @@ async function deployTestERC721(){
     return [testERC721]
 }
 
+async function deployAdapter(contractName, params) {
+    const adapterContract = await ethers.getContractFactory(contractName);
+    testERC721 = await testERC721Contract.deploy("Test", "TST");
+    console.log(`deployed testERC721 contract ${testERC721.address}`);
+    return [testERC721]
+}
+
 module.exports = {
     deployContracts,
     deployTestERC721,
