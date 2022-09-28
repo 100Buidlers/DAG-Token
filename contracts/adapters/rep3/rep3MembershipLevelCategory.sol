@@ -17,7 +17,7 @@ contract Rep3MembershipExists is IAdapter {
 
     function evaluate(bytes calldata data, address account) public view returns (bool) {
         address rep3TokenAddress = address(bytes20(data[:20]));
-        uint26 levelCategory = uint16(bytes2(data[:2]));
+        uint26 levelCategory = uint16(bytes2(data[20:22]));
         return IREP3Token(rep3TokenAddress).membershipExists(account, levelCategory);
     }
 }
